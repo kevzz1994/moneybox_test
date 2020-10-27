@@ -17,7 +17,20 @@ namespace Moneybox.App.Features
 
         public void Execute(Guid fromAccountId, decimal amount)
         {
-            // TODO:
+            // Get the user from:
+            var from = accountRepository.GetAccountById(fromAccountId);
+            // Validate the user:
+            if (from == null)
+            {
+                throw new InvalidOperationException("Cannot withdraw money from an nonexistent account.");
+            }
+            // Withdraw:
+            from.Withdraw(amount);
+            // Check if we need to send a notification to the user:
+            if (from.IsApproachingLowFunds())
+            {
+                notificationService.NotifyFundsLow(from.User.Email);
+            }
         }
     }
 }

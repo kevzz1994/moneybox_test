@@ -17,39 +17,37 @@ namespace Moneybox.App.Features
 
         public void Execute(Guid fromAccountId, Guid toAccountId, decimal amount)
         {
-            var from = this.accountRepository.GetAccountById(fromAccountId);
-            var to = this.accountRepository.GetAccountById(toAccountId);
-
-            var fromBalance = from.Balance - amount;
-            if (fromBalance < 0m)
+            // Get the user from:
+            var from = accountRepository.GetAccountById(fromAccountId);
+            // Get the user to transfer the amount for:
+            var to = accountRepository.GetAccountById(toAccountId);
+            // Validate users:
+            if (from == null || to == null)
             {
-                throw new InvalidOperationException("Insufficient funds to make transfer");
+                throw new InvalidOperationException("Cannot transfer to accounts that dont exist.");
             }
-
-            if (fromBalance < 500m)
+            // Validate if it comes from same account:
+            if (fromAccountId == toAccountId)
             {
-                this.notificationService.NotifyFundsLow(from.User.Email);
+                throw new InvalidOperationException("Cannot transfer to your own account.");
             }
-
-            var paidIn = to.PaidIn + amount;
-            if (paidIn > Account.PayInLimit)
+            // Withdraw:
+            from.Withdraw(amount);
+            // Deposit to account:
+            to.Deposit(amount);
+            // Check if we need to send a notification to the user:
+            if (from.IsApproachingLowFunds())
             {
-                throw new InvalidOperationException("Account pay in limit reached");
+                notificationService.NotifyFundsLow(from.User.Email);
             }
-
-            if (Account.PayInLimit - paidIn < 500m)
+            // Check if we need to send a notification to the user:
+            if (to.IsApproachingPayLimit())
             {
-                this.notificationService.NotifyApproachingPayInLimit(to.User.Email);
+                notificationService.NotifyApproachingPayInLimit(to.User.Email);
             }
-
-            from.Balance = from.Balance - amount;
-            from.Withdrawn = from.Withdrawn - amount;
-
-            to.Balance = to.Balance + amount;
-            to.PaidIn = to.PaidIn + amount;
-
-            this.accountRepository.Update(from);
-            this.accountRepository.Update(to);
+            // Update accounts:
+            accountRepository.Update(from);
+            accountRepository.Update(to);
         }
     }
 }
